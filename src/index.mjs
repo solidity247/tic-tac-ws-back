@@ -8,14 +8,12 @@ import { GameSession } from "./game_engine/index.mjs";
 const app = express();
 
 // Load SSL certificate and key
-const server = https.createServer(
-	{
-		key: fs.readFileSync("/etc/ssl/private/selfsigned.key"),
-		cert: fs.readFileSync("/etc/ssl/certs/selfsigned.crt"),
-		dhparam: fs.readFileSync("/etc/ssl/certs/dhparam.pem")
-	},
-	app
-);
+const options = {
+	key: fs.readFileSync("/etc/letsencrypt/live/webdevs.online/privkey.pem"),
+	cert: fs.readFileSync("/etc/letsencrypt/live/webdevs.online/fullchain.pem")
+};
+
+const server = https.createServer(options, app);
 
 const wss = new WebSocketServer({ noServer: true });
 
