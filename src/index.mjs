@@ -1,12 +1,22 @@
 import express from "express";
-import http from "http";
+import https from "https";
+import fs from "fs";
 import { WebSocketServer } from "ws";
 import cors from "cors";
 import { GameSession } from "./game_engine/index.mjs";
-import { type } from "os";
 
 const app = express();
-const server = http.createServer(app);
+
+// Load SSL certificate and key
+const server = https.createServer(
+	{
+		key: fs.readFileSync("/etc/ssl/private/selfsigned.key"),
+		cert: fs.readFileSync("/etc/ssl/certs/selfsigned.crt"),
+		dhparam: fs.readFileSync("/etc/ssl/certs/dhparam.pem")
+	},
+	app
+);
+
 const wss = new WebSocketServer({ noServer: true });
 
 app.use(cors());
@@ -17,11 +27,10 @@ const games = [];
 app.get("/", (req, res) => {
 	res.send({ message: "Hello from the server!" });
 });
-app.get("/api/games", (request, responce) => {
-	responce.send({ games });
-});
 
-let req = 0;
+app.get("/api/games", (request, response) => {
+	response.send({ games });
+});
 
 wss.on("connection", ws => {
 	console.log("New WebSocket connection");
@@ -43,7 +52,7 @@ wss.on("connection", ws => {
 		} else if (message.type === "createGame") {
 			session.name = message.payload.name;
 			session.role = "hostPlayer";
-			session.oponentRole = "secondPlayer";
+			session.opponentRole = "secondPlayer";
 			const id = Math.ceil(Math.random() * 100 % 100);
 			const newGame = new GameSession(id, session.name, ws);
 			session.game = newGame;
@@ -57,7 +66,7 @@ wss.on("connection", ws => {
 			const id = message.payload.id;
 			const player2Name = message.payload.playerName;
 			session.role = "secondPlayer";
-			session.oponentRole = "hostPlayer";
+			session.opponentRole = "hostPlayer";
 			const game = games.find(g => g.id && g.id === id);
 			game.setPlayer2(player2Name, ws);
 			session.game = game;
@@ -67,28 +76,28 @@ wss.on("connection", ws => {
 			};
 			ws.send(JSON.stringify(respMessage));
 			const startMessageToJoiner = {
-				type: "gameRuning",
+				type: "gameRunning",
 				payload: {
 					gamestate: {
 						boardState: session.game.sessionState,
 						turn: session.game.turn,
-						oponentUserName: session.game.hostPlayer
+						opponentUserName: session.game.hostPlayer
 					}
 				}
 			};
 			console.log("Sending to Joiner:", startMessageToJoiner);
 			ws.send(JSON.stringify(startMessageToJoiner));
 			const startMessageToHost = {
-				type: "gameRuning",
+				type: "gameRunning",
 				payload: {
 					gamestate: {
 						boardState: session.game.sessionState,
 						turn: session.game.turn,
-						oponentUserName: player2Name
+						opponentUserName: player2Name
 					}
 				}
 			};
-			console.log("Sending to Host:", startMessageToJoiner);
+			console.log("Sending to Host:", startMessageToHost);
 			game.hostClient.send(JSON.stringify(startMessageToHost));
 		} else if (message.type === "requestOpenGames") {
 			const list = games.filter(g => g.isOpen).map(({ id, hostPlayer }) => ({
@@ -152,8 +161,6 @@ wss.on("connection", ws => {
 		}
 
 		console.log("Received:", message);
-		// console.log("Received:", session);
-		// ws.send(JSON.stringify({ req, session }));
 	});
 
 	ws.on("close", () => {
@@ -173,9 +180,7 @@ server.on("upgrade", (request, socket, head) => {
 	}
 });
 
-// const PORT = process.env.PORT || 4000;
-// const PORT = process.env.PORT;
 const PORT = 4000;
 server.listen(PORT, "0.0.0.0", () => {
-	console.log(`Server is running on http://localhost:${PORT}`);
+	console.log(`Server is running on https://1.1.1.1:${PORT}`);
 });
